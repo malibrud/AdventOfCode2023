@@ -1,9 +1,12 @@
+// Solution to part 2 of https://adventofcode.com/2023/day/1
+// Mark Brudnak
+// Dec 1, 2023
+
 #include <fstream>
 #include <string>
 #include <map>
 
 using namespace std;
-
 
 map<string, int> numbers =
 {

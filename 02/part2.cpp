@@ -1,3 +1,7 @@
+// Solution to part 2 of https://adventofcode.com/2023/day/2
+// Mark Brudnak
+// Dec 2, 2023
+
 #include <fstream>
 #include <string>
 #include <regex>
