@@ -39,7 +39,7 @@ bool tryParseFileContents( char *fileName, vector<vector<int>>& outHistories )
     return true;
 }
 
-int getNextVal( vector<int> hist )
+int getPrevVal( vector<int> hist )
 {
     if ( std::equal( hist.begin() + 1, hist.end(), hist.begin() ) ) return hist[0];
     int N = hist.size();
@@ -49,7 +49,7 @@ int getNextVal( vector<int> hist )
         hist[ i ] = hist[ i + 1 ] - hist[ i ];
     }
     hist.resize( N-1 );
-    return last + getNextVal( hist );
+    return last + getPrevVal( hist );
 }
 
 int main( int argc, char *argv[] )
@@ -61,7 +61,7 @@ int main( int argc, char *argv[] )
     if ( !tryParseFileContents( argv[1], histories ) ) return 1;
 
     int sum = 0;
-    for ( int i = 0 ; i < histories.size() ; i++ ) sum += getNextVal( histories[ i ] );
+    for ( int i = 0 ; i < histories.size() ; i++ ) sum += getPrevVal( histories[ i ] );
 
     printf( "%d\n", sum );
     return 0;
