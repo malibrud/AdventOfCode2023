@@ -1,17 +1,25 @@
 @echo off
+
 if not exist build (
     mkdir build
 )
 pushd build
 
+if "%1" EQU "debug" (
+    set OPTFLAGS=/Od /MTd
+) else if "%1" EQU "release" (
+    set OPTFLAGS=/O2 /MT
+) else (
+    set OPTFLAGS=/Od /MTd
+)
+
 set CFLAGS=^
   /std:c++latest ^
   /EHsc ^
-  /Od ^
+  %OPTFLAGS% ^
   /Zi ^
   /nologo ^
-  /FC ^
-  /MTd
+  /FC 
 
 if not exist std.obj (
     cl %CFLAGS% "%VCToolsInstallDir%\modules\std.ixx"
