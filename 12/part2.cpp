@@ -12,16 +12,16 @@ import std;
 import std.compat;
 using namespace std;
 
-const int INVALID = -1;
+const int64_t INVALID = -1;
 
 class Cache
 {
-    vector<int> results;
-    int recLen;
-    int runLen;
-    int idx( int recIdx, int runIdx )
+    vector<int64_t> results;
+    int rows;
+    int cols;
+    int idx( int r, int c )
     {
-        int i = runIdx * recLen + runIdx;
+        int i = r * cols + c;
         assert( 0 <= i && i < results.size() );
         return i;
     }
@@ -30,21 +30,21 @@ public:
     {
         resize( 0, 0 );
     }
-    void resize( int _recLen, int _runLen )
+    void resize( int r, int c )
     {
-        recLen = _recLen;
-        runLen = _runLen;
-        int N = recLen * runLen;
+        rows = r;
+        cols = c;
+        int N = rows * cols;
         results.resize( N );
         results.assign( N, INVALID );
     }
-    int get( int recIdx, int runIdx )
+    int64_t get( int r, int c )
     {
-        return results[ idx( recIdx, runIdx ) ];
+        return results[ idx( r, c ) ];
     }
-    void set( int recIdx, int runIdx, int val )
+    void set( int r, int c, int64_t val )
     {
-        results[ idx( recIdx, runIdx ) ] = val;
+        results[ idx( r, c ) ] = val;
     }
 };
 
@@ -63,7 +63,7 @@ struct SpringRecord
         , N( record.size() )
         , R( runs.size() )
     {
-        resultsCache.resize( N, R );
+        resultsCache.resize( N+1, R+1 );
     }
 
     void unfold( int nCopies )
@@ -88,12 +88,16 @@ struct SpringRecord
         }
         N = record.size();
         R = runs.size();
+        resultsCache.resize( N+1, R+1 );
     }
 
-    int getArrangementCount( int recIdx, int runIdx )
+    int64_t getArrangementCount( int recIdx, int runIdx )
     {
+        // If indices exceed cache, pass call to actual calculation
+        if ( recIdx > N || runIdx > R ) return _getArrangementCount( recIdx, runIdx );
+
         // Check the results cache
-        int result = resultsCache.get( recIdx, runIdx );
+        int64_t result = resultsCache.get( recIdx, runIdx );
         if ( result != INVALID ) return result;
 
         // Compute and store
@@ -103,7 +107,7 @@ struct SpringRecord
     }
 
 private:
-    int _getArrangementCount( int recIdx, int runIdx )
+    int64_t _getArrangementCount( int recIdx, int runIdx )
     {
         // End condition 1.
         // Check to see if we are out of runs.
@@ -119,7 +123,7 @@ private:
         if ( recIdx >= N) return 0;
 
         // Nornal condition
-        int count = 0;
+        int64_t count = 0;
         int runLen = runs[ runIdx ];
         switch ( record[ recIdx ] )
         {
@@ -204,7 +208,7 @@ int main( int argc, char *argv[] )
         vector<SpringRecord> records;
         if ( !tryParseFileContents( argv[1], records ) ) return 1;
 
-        uint64_t sum = 0;
+        int64_t sum = 0;
         for ( auto& record : records )
         {
             record.unfold( 5 );
@@ -212,7 +216,7 @@ int main( int argc, char *argv[] )
             sum += record.getArrangementCount( 0, 0 );
         }
 
-        printf( "%llu\n", sum );
+        printf( "%lld\n", sum );
     }
     catch(const std::exception& e)
     {
