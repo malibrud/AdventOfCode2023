@@ -3,6 +3,7 @@
 // Dec 21, 2023
 
 #include <cassert>
+#define noop /* no operation */
 
 import std;
 import std.compat;
@@ -57,6 +58,23 @@ vector<string> transposePattern( vector<string>& inPattern )
     return outPattern;
 }
 
+bool isTopBottomSymmetric( vector<string>& pattern, int rowAboveReflectionLine )
+{
+    int W = pattern[0].size();
+    int H = pattern.size();
+
+    int ic = rowAboveReflectionLine;
+    int d = min( ic+1, H-ic-1 );
+    
+    for ( int j = 0 ; j < d ; j++ )
+    {
+        int tIdx = ic-j;
+        int bIdx = ic+j+1;
+        if ( pattern[tIdx] != pattern[bIdx] ) return false;
+    }
+    return true;
+}
+
 bool isTopBottomSymmetricWithSmudge( vector<string>& pattern, int rowAboveReflectionLine )
 {
     int W = pattern[0].size();
@@ -65,6 +83,7 @@ bool isTopBottomSymmetricWithSmudge( vector<string>& pattern, int rowAboveReflec
     int diffCount = 0;
     int ic = rowAboveReflectionLine;
     int d = min( ic+1, H-ic-1 );
+
     for ( int j = 0 ; j < d ; j++ )
     {
         int tIdx = ic-j;
@@ -73,6 +92,13 @@ bool isTopBottomSymmetricWithSmudge( vector<string>& pattern, int rowAboveReflec
     }
     return diffCount == 1;
 }
+
+enum SymmetryAxis
+{
+    NF, // not found
+    LR, // Left-Right
+    TB
+};
 
 int main( int argc, char *argv[] )
 {
@@ -88,21 +114,69 @@ int main( int argc, char *argv[] )
     {
         int W = pattern[0].size();
         int H = pattern.size();
+        auto tPattern = transposePattern( pattern );
+
+        // Remember the non-smudged symmetry
+        SymmetryAxis originalSymmetry = NF;
+        int originalIndex;
+
+        // Check for T-B symmetry
+        for ( int ic = 0 ; ic < H-1 ; ic++ )
+        {
+            if ( isTopBottomSymmetric( pattern, ic  ) ) 
+            {
+                originalIndex = ic;
+                originalSymmetry = TB;
+            }
+        }
+
+        // Check for L-R symmetry by transposing and using the T-B algorithm
+        if ( originalSymmetry == NF )
+        for ( int ic = 0 ; ic < W-1 ; ic++ )
+        {
+            if ( isTopBottomSymmetric( tPattern, ic  ) ) 
+            {
+                originalIndex = ic;
+                originalSymmetry = LR;
+            }
+        }
+
+        SymmetryAxis newSymmetry = NF;
+        int newIndex;
 
         // Check for T-B symmetry
         for ( int ic = 0 ; ic < H-1 ; ic++ )
         {
             if ( isTopBottomSymmetricWithSmudge( pattern, ic  ) ) 
-                sum += 100 * ( ic + 1 );
+            {
+                newIndex = ic;
+                newSymmetry = TB;
+                if ( originalIndex != newIndex || originalSymmetry != newSymmetry )
+                {
+                    sum += 100 * ( ic + 1 );
+                    goto NEW_SYMMETRY_FOUND;
+                }
+            }
         }
 
         // Check for L-R symmetry by transposing and using the T-B algorithm
-        auto tPattern = transposePattern( pattern );
-        for ( int ic = 0 ; ic < H-1 ; ic++ )
+        if ( newSymmetry == NF )
+        for ( int ic = 0 ; ic < W-1 ; ic++ )
         {
-            if ( isTopBottomSymmetricWithSmudge( pattern, ic  ) ) 
-                sum += 1 * ( ic + 1 );
+            if ( isTopBottomSymmetricWithSmudge( tPattern, ic  ) ) 
+            {
+                newIndex = ic;
+                newSymmetry = LR;
+                if ( originalIndex != newIndex || originalSymmetry != newSymmetry )
+                {
+                    sum += 1 * ( ic + 1 );
+                    goto NEW_SYMMETRY_FOUND;
+                }
+            }
         }
+
+        NEW_SYMMETRY_FOUND:
+        noop;
     }
 
     printf( "%d\n", sum );
