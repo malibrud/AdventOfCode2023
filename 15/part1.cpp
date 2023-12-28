@@ -1,6 +1,6 @@
-// Solution to part 1 of https://adventofcode.com/2023/day/14
+// Solution to part 1 of https://adventofcode.com/2023/day/15
 // Mark Brudnak
-// Dec 22, 2023
+// Dec 25, 2023
 
 #include <cassert>
 
