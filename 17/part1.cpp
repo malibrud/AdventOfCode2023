@@ -30,10 +30,20 @@ bool tryParseFileContents( char *fileName, vector<string>& outMap )
     return true;
 }
 
+enum EnterDirection
+{
+    E,
+    N,
+    W,
+    S,
+    O
+};
+
 struct Node
 {
     int f, g, h;
     int loss;
+    EnterDirection d;
     int r, c;
     bool inOpenSet;
     Node *prev;
@@ -66,36 +76,52 @@ int main( int argc, char *argv[] )
     int R = costMap.size();
     int C = costMap[0].size();
     
-    // Populate the A* grid
-    vector< vector< Node > > grid( R, vector<Node>( C ) );
+    // Populate the A* grids
+    vector< vector< Node > > egrid( R, vector<Node>( C ) );
+    vector< vector< Node > > ngrid( R, vector<Node>( C ) );
+    vector< vector< Node > > wgrid( R, vector<Node>( C ) );
+    vector< vector< Node > > sgrid( R, vector<Node>( C ) );
     for ( int r = 0 ; r < R ; r++ )
     for ( int c = 0 ; c < C ; c++ )
     {
-        auto& n = grid[r][c];
+        auto& n = egrid[r][c];
         n.loss = costMap[r][c] - '0';
         n.r = r;
         n.c = c;
-    }
+        ngrid[r][c] = n;
+        wgrid[r][c] = n;
+        sgrid[r][c] = n;
 
-    auto& n = grid[0][0];
+        egrid[r][c].d = E;
+        ngrid[r][c].d = N;
+        wgrid[r][c].d = W;
+        sgrid[r][c].d = S;
+    }
+    egrid[0][0].d = O;
+    ngrid[0][0].d = O;
+    wgrid[0][0].d = O;
+    sgrid[0][0].d = O;
+
+    auto& n = egrid[0][0];
     n.g = 0;
     n.h = R - 1 + C - 1;
     n.f = n.g + n.h;
 
     priority_queue< Node*, vector<Node*>, Compare > openSet;
-    openSet.push( &grid[0][0] );
+    openSet.push( &egrid[0][0] );
 
-    int directions[4][2] = 
+    int directions[4][3] = 
     {
-        {-1,  0}, 
-        { 1,  0}, 
-        { 0, -1}, 
-        { 0,  1}
+        {-1,  0, E}, 
+        { 0,  1, N},
+        { 1,  0, W}, 
+        { 0, -1, S} 
     };
 
+    Node *current;
     while ( !openSet.empty() )
     {
-        auto current = openSet.top();
+        current = openSet.top();
         openSet.pop();
         current->inOpenSet = false;
 
@@ -105,6 +131,7 @@ int main( int argc, char *argv[] )
         {
             auto cc = current->c;
             auto cr = current->r;
+            auto di = directions[d][2];
             auto dc = directions[d][1];
             auto dr = directions[d][0];
             auto nc = cc + dc;
@@ -114,52 +141,54 @@ int main( int argc, char *argv[] )
             if ( 
                 // Look one back
                 current->prev && 
-                current->prev->r == cr - 1*dr &&
-                current->prev->c == cc - 1*dc 
+                current->prev->d == di
                 &&
                 // Look two back
                 current->prev->prev && 
-                current->prev->prev->r == cr - 2*dr &&
-                current->prev->prev->c == cc - 2*dc
-                &&
-                // Look two back
-                current->prev->prev->prev && 
-                current->prev->prev->prev->r == cr - 3*dr &&
-                current->prev->prev->prev->c == cc - 3*dc
+                current->prev->prev->d == di
+                // &&
+                // Look three back
+                // current->prev->prev->prev && 
+                // current->prev->prev->prev->d == di
             ) continue;
 
             // Prevent backtracking
-            if ( 
-                // Look one back
-                current->prev && 
-                current->prev->r == nr &&
-                current->prev->c == nc
-            ) continue;
+            if ( di == E && current->d == W ) continue;
+            if ( di == N && current->d == S ) continue;
+            if ( di == W && current->d == E ) continue;
+            if ( di == S && current->d == N ) continue;
 
             if ( nr < 0 || nr >= R ) continue;
             if ( nc < 0 || nc >= C ) continue;
 
-            Node &neighbor = grid[nr][nc];
-            auto g = current->g + neighbor.loss;
+            Node *neighbor;
+            switch (di)
+            {
+            case E: neighbor = &egrid[nr][nc]; break;
+            case N: neighbor = &ngrid[nr][nc]; break;
+            case W: neighbor = &wgrid[nr][nc]; break;
+            case S: neighbor = &sgrid[nr][nc]; break;
+            }
+            auto g = current->g + neighbor->loss;
             auto h = R-nr-1 + C-nc-1;
             auto f = g + h;
-            if ( f < neighbor.f )
+            if ( f < neighbor->f )
             {
-                neighbor.g = g;
-                neighbor.h = h;
-                neighbor.f = f;
-                neighbor.prev = current;
-                if ( !neighbor.inOpenSet )
+                neighbor->g = g;
+                neighbor->h = h;
+                neighbor->f = f;
+                neighbor->prev = current;
+                if ( !neighbor->inOpenSet )
                 {
-                    openSet.push( &neighbor );
-                    neighbor.inOpenSet = true;
+                    openSet.push( neighbor );
+                    neighbor->inOpenSet = true;
                 }
             }
         }
     }
 
     vector<string> figure( R, string( C, '.' ) );
-    auto prev = &grid[R-1][C-1];
+    auto prev = current;
     int loss = 0;
     while (prev != nullptr )
     {
@@ -174,6 +203,6 @@ int main( int argc, char *argv[] )
         cout << row << endl;
     }
 
-    auto totalLoss = grid[R-1][C-1].g;
+    auto totalLoss = current->g;
     printf( "%d\n", totalLoss );
 }
