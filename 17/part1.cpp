@@ -3,6 +3,7 @@
 // Dec 28, 2023
 
 // Inspired by 2021, Day 15 solution: https://github.com/malibrud/AdventOfCode2021/blob/master/15/main.cpp
+// Aided by https://www.youtube.com/watch?v=2pDSooPLLkI
 
 #include <cassert>
 #include <climits>
@@ -30,39 +31,48 @@ bool tryParseFileContents( char *fileName, vector<string>& outMap )
     return true;
 }
 
-enum EnterDirection
-{
-    E,
-    N,
-    W,
-    S,
-    O
-};
+static int g_R = 0;
+static int g_C = 0;
 
 struct Node
 {
-    int f, g, h;
-    int loss;
-    EnterDirection d;
     int r, c;
-    bool inOpenSet;
-    Node *prev;
+    int dr, dc;
+    int g;
+    int ndir;
 
-    Node()
+    const int f() const { return g + ( g_R - 1 - r) + (g_C - 1 - c); }
+
+    bool same( const Node& v ) const
     {
-        loss = 0;
-        r  = c = 0;
-        f = g = h = INT_MAX;
-        inOpenSet = false;
-        prev = nullptr;
+        return 
+            r == v.r &&
+            c == v.c &&
+            dr == v.dr &&
+            dc == v.dc &&
+            ndir == v.ndir
+        ;
+    }
+
+    bool isInBounds() { return r >= 0 && r < g_R && c >= 0 && c < g_C; }
+
+    Node() : Node( 0, 0, 0, 0, 0, 0 ) {}
+    Node(int _r, int _c, int _dr, int _dc, int _g, int _ndir )
+    {
+        r = _r;
+        c = _c;
+        dr = _dr;
+        dc = _dc;
+        g = _g;
+        ndir = _ndir;
     }
 };
 
 struct Compare
 {
-    bool operator()(const Node *n1, const Node *n2)
+    bool operator()(const Node& n1, const Node& n2) const
     {
-        return n1->f > n2->f;
+        return n1.f() > n2.f();
     }
 };
 
@@ -73,136 +83,74 @@ int main( int argc, char *argv[] )
 
     vector<string> costMap;
     if ( !tryParseFileContents( argv[1], costMap ) ) return 1;
-    int R = costMap.size();
-    int C = costMap[0].size();
+    g_R = costMap.size();
+    g_C = costMap[0].size();
     
-    // Populate the A* grids
-    vector< vector< Node > > egrid( R, vector<Node>( C ) );
-    vector< vector< Node > > ngrid( R, vector<Node>( C ) );
-    vector< vector< Node > > wgrid( R, vector<Node>( C ) );
-    vector< vector< Node > > sgrid( R, vector<Node>( C ) );
-    for ( int r = 0 ; r < R ; r++ )
-    for ( int c = 0 ; c < C ; c++ )
+    set<Node, Compare> seen;
+    priority_queue< Node, vector<Node>, Compare > openSet;
+
+    openSet.emplace( 0, 0, 0, 0, 0, 0 );
+
+    int directions[4][2] = 
     {
-        auto& n = egrid[r][c];
-        n.loss = costMap[r][c] - '0';
-        n.r = r;
-        n.c = c;
-        ngrid[r][c] = n;
-        wgrid[r][c] = n;
-        sgrid[r][c] = n;
-
-        egrid[r][c].d = E;
-        ngrid[r][c].d = N;
-        wgrid[r][c].d = W;
-        sgrid[r][c].d = S;
-    }
-    egrid[0][0].d = O;
-    ngrid[0][0].d = O;
-    wgrid[0][0].d = O;
-    sgrid[0][0].d = O;
-
-    auto& n = egrid[0][0];
-    n.g = 0;
-    n.h = R - 1 + C - 1;
-    n.f = n.g + n.h;
-
-    priority_queue< Node*, vector<Node*>, Compare > openSet;
-    openSet.push( &egrid[0][0] );
-
-    int directions[4][3] = 
-    {
-        {-1,  0, E}, 
-        { 0,  1, N},
-        { 1,  0, W}, 
-        { 0, -1, S} 
+        {-1,  0 }, 
+        { 0,  1 },
+        { 1,  0 }, 
+        { 0, -1 } 
     };
 
-    Node *current;
+    Node current;
     while ( !openSet.empty() )
     {
         current = openSet.top();
         openSet.pop();
-        current->inOpenSet = false;
 
-        if ( current->r == R-1 && current->c == C-1 ) break;
+        if ( current.r == g_R-1 && current.c == g_C-1 ) break;
 
-        for ( auto d = 0 ; d < 4 ; d++)
+        if ( seen.end() != find_if( seen.begin(), seen.end(), [current]( const Node& v ) { return current.same(v); } ) 
+        ) continue;
+
+        seen.insert(current);
+
+        // Try straight path
+        if ( current.ndir < 3 )
         {
-            auto cc = current->c;
-            auto cr = current->r;
-            auto di = directions[d][2];
-            auto dc = directions[d][1];
-            auto dr = directions[d][0];
-            auto nc = cc + dc;
-            auto nr = cr + dr;
+            int nr = current.r + current.dr;
+            int nc = current.c + current.dc;
+            int ng = current.g + costMap[nr][nc];
+            Node neighbor(
+                nr, nc,
+                current.dr, current.dc,
+                ng,
+                current.ndir + 1
+            );
+            if ( neighbor.f() < current.f() && neighbor.isInBounds() ) openSet.push( neighbor );
+        }
 
-            // limit linear runs to no more than 3.
-            if ( 
-                // Look one back
-                current->prev && 
-                current->prev->d == di
-                &&
-                // Look two back
-                current->prev->prev && 
-                current->prev->prev->d == di
-                // &&
-                // Look three back
-                // current->prev->prev->prev && 
-                // current->prev->prev->prev->d == di
-            ) continue;
+        // Try left turn
+        {
 
-            // Prevent backtracking
-            if ( di == E && current->d == W ) continue;
-            if ( di == N && current->d == S ) continue;
-            if ( di == W && current->d == E ) continue;
-            if ( di == S && current->d == N ) continue;
+        int ndr = +current.dc;
+        int ndc = -current.dr;
+        int nr = current.r + ndr;
+        int nc = current.c + ndc;
+        int ng = current.g + costMap[nr][nc];
+        Node neighbor( nr, nc, ndr, ndc, ng, 1 );
+        if ( neighbor.f() < current.f() && neighbor.isInBounds() ) openSet.push( neighbor );
+        }
 
-            if ( nr < 0 || nr >= R ) continue;
-            if ( nc < 0 || nc >= C ) continue;
-
-            Node *neighbor;
-            switch (di)
-            {
-            case E: neighbor = &egrid[nr][nc]; break;
-            case N: neighbor = &ngrid[nr][nc]; break;
-            case W: neighbor = &wgrid[nr][nc]; break;
-            case S: neighbor = &sgrid[nr][nc]; break;
-            }
-            auto g = current->g + neighbor->loss;
-            auto h = R-nr-1 + C-nc-1;
-            auto f = g + h;
-            if ( f < neighbor->f )
-            {
-                neighbor->g = g;
-                neighbor->h = h;
-                neighbor->f = f;
-                neighbor->prev = current;
-                if ( !neighbor->inOpenSet )
-                {
-                    openSet.push( neighbor );
-                    neighbor->inOpenSet = true;
-                }
-            }
+        {
+        // Try right turn
+        int ndr = -current.dc;
+        int ndc = +current.dr;
+        int nr = current.r + ndr;
+        int nc = current.c + ndc;
+        int ng = current.g + costMap[nr][nc];
+        Node neighbor( nr, nc, ndr, ndc, ng, 1 );
+        if ( neighbor.f() < current.f() && neighbor.isInBounds() ) openSet.push( neighbor );
         }
     }
 
-    vector<string> figure( R, string( C, '.' ) );
-    auto prev = current;
-    int loss = 0;
-    while (prev != nullptr )
-    {
-        figure[prev->r][prev->c] = '#';
-        printf( "(%d, %d) => %d\n", prev->r, prev->c, prev->g );
-        loss += prev->loss;
-        prev = prev->prev;
-    }
-
-    for ( auto& row : figure )
-    {
-        cout << row << endl;
-    }
-
-    auto totalLoss = current->g;
+    auto totalLoss = current.g;
     printf( "%d\n", totalLoss );
 }
